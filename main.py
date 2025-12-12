@@ -133,7 +133,7 @@ def analisar_com_llm(texto: str) -> List[dict]:
     print("\n[ETAPA 2] Analisando texto com LLM (Gemini)...")
 
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash-preview-05-20",
+        model="gemini-1.5-flash",
         temperature=0,
         google_api_key=GOOGLE_API_KEY
     )

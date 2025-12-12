@@ -272,7 +272,7 @@ def analisar_com_llm(texto: str) -> List[dict]:
     Retorna uma lista de dicionarios com informacoes de cada campo.
     """
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash-preview-05-20",
+        model="gemini-2.5-flash",
         temperature=0,
         google_api_key=GOOGLE_API_KEY
     )
@@ -502,31 +502,10 @@ if 'arquivo_pdf' not in st.session_state:
 
 st.markdown('<div class="section-title">Etapa 1: Carregar Documento</div>', unsafe_allow_html=True)
 
-# Mostra os formatos suportados
-st.markdown("""
-<div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
-    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid #e74c3c; border-radius: 10px; padding: 15px 20px; text-align: center; min-width: 120px;">
-        <div style="font-size: 28px; margin-bottom: 5px;">📄</div>
-        <div style="color: #e74c3c; font-weight: 600; font-size: 14px;">PDF</div>
-        <div style="color: #888; font-size: 11px;">.pdf</div>
-    </div>
-    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid #3498db; border-radius: 10px; padding: 15px 20px; text-align: center; min-width: 120px;">
-        <div style="font-size: 28px; margin-bottom: 5px;">🖼️</div>
-        <div style="color: #3498db; font-weight: 600; font-size: 14px;">Imagens</div>
-        <div style="color: #888; font-size: 11px;">.png .jpg .jpeg .bmp .tiff</div>
-    </div>
-    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid #2ecc71; border-radius: 10px; padding: 15px 20px; text-align: center; min-width: 120px;">
-        <div style="font-size: 28px; margin-bottom: 5px;">📝</div>
-        <div style="color: #2ecc71; font-weight: 600; font-size: 14px;">Word</div>
-        <div style="color: #888; font-size: 11px;">.docx .doc</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
 uploaded_file = st.file_uploader(
-    "Arraste ou selecione seu documento",
+    "Selecione o documento (PDF, Imagem ou Word)",
     type=['pdf', 'png', 'jpg', 'jpeg', 'bmp', 'tiff', 'tif', 'docx', 'doc'],
-    help="Tamanho máximo: 200MB"
+    help="📄 PDF | 🖼️ Imagens (PNG, JPG, BMP, TIFF) | 📝 Word (DOCX, DOC)"
 )
 
 if uploaded_file:
