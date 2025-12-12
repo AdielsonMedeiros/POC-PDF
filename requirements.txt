@@ -1,0 +1,31 @@
+# =============================================================================
+# REVERSE TEMPLATING POC - Dependências
+# =============================================================================
+# Instalar com: pip install -r requirements.txt
+# =============================================================================
+
+# Interface Web
+streamlit>=1.28.0
+
+# Leitura e extração de PDF
+pdfplumber>=0.10.0
+
+# Manipulação de PDF (merge de páginas)
+PyPDF2>=3.0.0
+
+# Geração de PDF (overlay)
+reportlab>=4.0.0
+
+# Preview de PDF (opcional, mas recomendado)
+pymupdf>=1.23.0
+
+# LangChain para orquestração de LLM
+langchain>=0.1.0
+langchain-google-genai>=1.0.0
+langchain-core>=0.1.0
+
+# Google Generative AI (Gemini)
+google-generativeai>=0.3.0
+
+# Opcional: para usar variáveis de ambiente
+python-dotenv>=1.0.0

@@ -1,0 +1,69 @@
+# =============================================================================
+# ARQUIVOS SENSIVEIS - NAO SUBIR PARA O GITHUB
+# =============================================================================
+
+# Variaveis de ambiente (contem API Keys)
+.env
+.env.local
+.env.production
+
+# =============================================================================
+# PYTHON
+# =============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# =============================================================================
+# IDEs
+# =============================================================================
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# =============================================================================
+# SISTEMA OPERACIONAL
+# =============================================================================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# =============================================================================
+# ARQUIVOS DO PROJETO
+# =============================================================================
+
+# PDFs de teste (opcional - remova se quiser incluir exemplos)
+*.pdf
+
+# Logs
+*.log
+
+# Cache do Streamlit
+.streamlit/
