@@ -1,42 +1,40 @@
-# Reverse Templating - POC
+# 📄 Reverse Templating POC
 
-Sistema de identificacao e substituicao de variaveis em documentos PDF utilizando Inteligencia Artificial.
+Sistema inteligente de identificação e substituição de variáveis em documentos PDF usando IA.
 
-## Sobre o Projeto
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)
+![Tests](https://img.shields.io/badge/Tests-119%20passing-brightgreen.svg)
+![Coverage](https://img.shields.io/badge/Coverage-74%25-yellow.svg)
 
-Este projeto implementa um sistema de "Reverse Templating" que:
+## 🎯 O que é?
 
-1. **Extrai** texto e coordenadas de documentos PDF (texto nativo ou OCR)
-2. **Identifica** automaticamente TODOS os campos variaveis usando IA (Google Gemini)
-3. **Mapeia** os campos identificados com suas posicoes no documento
-4. **Armazena** templates em banco de dados para reutilizacao
-5. **Gera** um novo PDF com os valores substituidos mantendo o layout original
+O **Reverse Templating** é uma prova de conceito que permite:
 
-## Tecnologias Utilizadas
+1. **Upload de documentos** - PDF, imagens (PNG, JPG, TIFF) ou Word (DOCX)
+2. **Análise inteligente** - IA identifica automaticamente campos variáveis (nomes, datas, valores, CPFs, etc.)
+3. **Substituição fácil** - Preencha novos valores e gere um novo documento
+4. **Aprendizado** - O sistema memoriza templates para processamento instantâneo de documentos similares
 
-| Tecnologia | Funcao |
-|------------|--------|
-| Python 3.10+ | Linguagem principal |
-| Streamlit | Interface web |
-| pdfplumber | Extracao de texto nativo |
-| Tesseract OCR | Extracao de PDFs escaneados |
-| Google Gemini | Modelo de IA para identificacao |
-| ReportLab | Geracao de PDFs |
-| PyPDF2 | Manipulacao de PDFs |
-| LangChain | Orquestracao de LLM |
-| SQLite | Persistencia de templates |
-| ChromaDB | Busca por similaridade (futuro) |
+## ✨ Funcionalidades
 
-## Instalacao
+- 🔍 **Detecção automática de campos** usando Google Gemini AI
+- 📝 **Suporte a múltiplos formatos**: PDF, PNG, JPG, JPEG, BMP, TIFF, DOCX, DOC
+- 🔄 **OCR integrado** para PDFs escaneados (Tesseract)
+- 💾 **Banco de templates** com SQLite + ChromaDB
+- 🔎 **Busca por similaridade** para encontrar templates parecidos
+- 📊 **Interface web moderna** com Streamlit
 
-### 1. Clone o repositorio
+## 🚀 Início Rápido
+
+### 1. Clone o repositório
 
 ```bash
 git clone https://github.com/seu-usuario/reverse-templating.git
 cd reverse-templating
 ```
 
-### 2. Crie um ambiente virtual (recomendado)
+### 2. Crie um ambiente virtual
 
 ```bash
 python -m venv venv
@@ -48,18 +46,27 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
-### 3. Instale as dependencias
+### 3. Instale as dependências
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Instale o Tesseract OCR (opcional, para PDFs escaneados)
+### 4. Configure as variáveis de ambiente
+
+Crie um arquivo `.env` na raiz do projeto:
+
+```env
+GOOGLE_API_KEY=sua_chave_api_do_google_gemini
+```
+
+> ⚠️ **Importante**: Nunca compartilhe sua API key. O arquivo `.env` está no `.gitignore`.
+
+### 5. (Opcional) Instale o Tesseract para OCR
 
 **Windows:**
-1. Baixe o instalador: https://github.com/UB-Mannheim/tesseract/wiki
-2. Execute o instalador
-3. Adicione ao PATH: `C:\Program Files\Tesseract-OCR`
+- Baixe de: https://github.com/UB-Mannheim/tesseract/wiki
+- Adicione ao PATH
 
 **Linux (Ubuntu/Debian):**
 ```bash
@@ -71,131 +78,136 @@ sudo apt-get install tesseract-ocr tesseract-ocr-por
 brew install tesseract tesseract-lang
 ```
 
-### 5. Configure as variaveis de ambiente
+### 6. Execute a aplicação
 
 ```bash
-# Copie o arquivo de exemplo
-cp .env.example .env
-
-# Edite o arquivo .env e adicione sua API Key do Google Gemini
-```
-
-Para obter sua API Key do Google Gemini:
-1. Acesse: https://aistudio.google.com/app/apikey
-2. Crie uma nova API Key
-3. Cole no arquivo `.env`
-
-## Como Executar
-
-### Interface Web (Recomendado)
-
-```bash
-python -m streamlit run app.py
+streamlit run app.py
 ```
 
 Acesse: http://localhost:8501
 
-### Linha de Comando
-
-```bash
-# Primeiro, gere um PDF de exemplo
-python criar_pdf_exemplo.py
-
-# Execute o processamento
-python main.py
-```
-
-### Testar Modulos Individualmente
-
-```bash
-# Testar OCR
-python ocr_engine.py
-
-# Testar Banco de Dados
-python database.py
-```
-
-## Estrutura do Projeto
+## 📁 Estrutura do Projeto
 
 ```
 reverse-templating/
-├── app.py                  # Interface web (Streamlit)
-├── main.py                 # Script de linha de comando
-├── ocr_engine.py           # Motor de OCR (Tesseract)
-├── database.py             # Persistencia (SQLite + ChromaDB)
-├── criar_pdf_exemplo.py    # Gerador de PDF de teste
-├── requirements.txt        # Dependencias do projeto
-├── .env.example            # Exemplo de configuracao
-├── .gitignore              # Arquivos ignorados pelo Git
-└── README.md               # Documentacao
+├── app.py              # Aplicação principal (Streamlit)
+├── conversor.py        # Conversão de formatos (imagem/Word → PDF)
+├── database.py         # Persistência (SQLite + ChromaDB)
+├── ocr_engine.py       # Motor de OCR (Tesseract)
+├── requirements.txt    # Dependências Python
+├── .env.example        # Exemplo de configuração
+├── .gitignore          # Arquivos ignorados pelo Git
+├── tests/              # Testes automatizados
+│   ├── conftest.py     # Fixtures compartilhadas
+│   ├── test_*.py       # Arquivos de teste
+│   └── README.md       # Documentação dos testes
+└── data/               # Banco de dados local (ignorado pelo Git)
 ```
 
-## Fluxo de Funcionamento
+## 🧪 Testes
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Upload PDF    │────>│  Calcula Hash   │────>│  Busca no DB    │
-│                 │     │  do documento   │     │                 │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-                                                        │
-                              ┌─────────────────────────┼─────────────────────────┐
-                              │                         │                         │
-                              v                         v                         v
-                    ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
-                    │  Template       │       │  Extracao       │       │  Analise IA     │
-                    │  encontrado!    │       │  OCR/Nativo     │       │  (Gemini)       │
-                    │  (instantaneo)  │       │                 │       │                 │
-                    └─────────────────┘       └─────────────────┘       └─────────────────┘
-                              │                         │                         │
-                              │                         │                         v
-                              │                         │               ┌─────────────────┐
-                              │                         │               │  Salva no DB    │
-                              │                         │               │  (cache)        │
-                              │                         │               └─────────────────┘
-                              │                         │                         │
-                              v                         v                         v
-                    ┌─────────────────────────────────────────────────────────────┐
-                    │                    Mapeamento de Coordenadas                │
-                    └─────────────────────────────────────────────────────────────┘
-                                                        │
-                                                        v
-                    ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
-                    │  Edicao de      │────>  │  Geracao PDF    │────>  │  Download       │
-                    │  Valores        │       │  (ReportLab)    │       │  Novo PDF       │
-                    └─────────────────┘       └─────────────────┘       └─────────────────┘
+O projeto possui uma suíte completa de testes automatizados:
+
+```bash
+# Executar todos os testes
+python -m pytest tests/ -v
+
+# Executar com cobertura
+python -m pytest tests/ --cov=conversor --cov=database --cov=ocr_engine
+
+# Executar testes específicos
+python -m pytest tests/test_conversor.py -v
 ```
 
-## Campos Identificados Automaticamente
+### Métricas de Testes
 
-O sistema identifica automaticamente qualquer campo variavel, incluindo:
+| Métrica | Valor |
+|---------|-------|
+| Total de testes | 119 |
+| Testes passando | 119 ✅ |
+| Cobertura | 74% |
 
-- Nomes de pessoas ou empresas
-- Datas (qualquer formato)
-- Valores monetarios
-- Numeros de documentos (CPF, CNPJ, RG, etc.)
-- Enderecos
-- Telefones e emails
-- Numeros de pedido, fatura, contrato
-- Quantidades e percentuais
-- Qualquer outro dado especifico do documento
+## 📋 Formatos Suportados
 
-## Recursos
+| Formato | Extensões | Processamento |
+|---------|-----------|---------------|
+| PDF | `.pdf` | Nativo ou OCR |
+| Imagens | `.png`, `.jpg`, `.jpeg`, `.bmp`, `.tiff`, `.tif` | OCR + conversão para PDF |
+| Word | `.docx`, `.doc` | Extração de texto + conversão para PDF |
 
-- **Deteccao automatica** de PDFs escaneados vs texto nativo
-- **Cache inteligente** de templates para processamento instantaneo
-- **Interface web** intuitiva e responsiva
-- **Suporte multilinguagem** no OCR (portugues + ingles)
+## 🔧 Tecnologias
 
-## Seguranca
+- **Interface**: Streamlit
+- **IA/LLM**: Google Gemini (via LangChain)
+- **PDF**: pdfplumber, PyMuPDF, ReportLab, PyPDF2
+- **OCR**: Tesseract (pytesseract)
+- **Banco de Dados**: SQLite + ChromaDB
+- **Documentos Word**: python-docx
+- **Testes**: pytest, pytest-cov
 
-- API Keys sao armazenadas em variaveis de ambiente (`.env`)
-- Arquivos sensiveis estao no `.gitignore`
-- Banco de dados local (dados nao saem da maquina)
+## 📖 Como Funciona
 
-## Licenca
+### 1. Upload do Documento
+O usuário faz upload de um documento. Se não for PDF, é convertido automaticamente.
 
-Este projeto e uma Prova de Conceito (POC) desenvolvida para fins de estudo e demonstracao.
+### 2. Cálculo de Hash
+Um hash único é calculado baseado na "estrutura" do documento (ignorando valores variáveis).
 
-## Autor
+### 3. Busca de Template
+- **Hash exato**: Se o documento já foi processado, usa o template salvo (instantâneo)
+- **Similaridade**: Se há um template similar (>75%), reutiliza os mapeamentos
+- **Análise IA**: Caso contrário, a IA analisa e identifica os campos
 
-PitangaTech
+### 4. Identificação de Campos
+A IA (Gemini) identifica todos os campos variáveis:
+- Nomes, CPFs, CNPJs
+- Datas, valores monetários
+- Endereços, telefones, emails
+- Números de documentos, etc.
+
+### 5. Mapeamento de Coordenadas
+Os campos identificados são mapeados para suas posições exatas no PDF.
+
+### 6. Geração do Documento
+O usuário preenche novos valores e um novo PDF é gerado com as substituições.
+
+## 🤝 Contribuindo
+
+1. Faça um fork do projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
+3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
+4. Push para a branch (`git push origin feature/nova-feature`)
+5. Abra um Pull Request
+
+## 📝 Licença
+
+Este projeto é uma Prova de Conceito (POC) para fins de demonstração.
+
+## ⚙️ Configuração para Desenvolvimento
+
+### Obtendo a API Key do Google Gemini
+
+1. Acesse: https://makersuite.google.com/app/apikey
+2. Crie uma nova API key
+3. Adicione ao arquivo `.env`
+
+### Variáveis de Ambiente
+
+| Variável | Descrição | Obrigatória |
+|----------|-----------|-------------|
+| `GOOGLE_API_KEY` | Chave da API do Google Gemini | ✅ Sim |
+
+## 🐛 Problemas Comuns
+
+### "GOOGLE_API_KEY não configurada"
+Certifique-se de criar o arquivo `.env` com sua chave API.
+
+### "Tesseract não encontrado"
+Instale o Tesseract seguindo as instruções acima para seu sistema operacional.
+
+### OCR retornando texto vazio
+Verifique se os pacotes de idioma do Tesseract estão instalados (`tesseract-ocr-por` para português).
+
+---
+
+Desenvolvido com ❤️ usando Python e IA

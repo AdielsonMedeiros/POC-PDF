@@ -6,6 +6,14 @@
 .env
 .env.local
 .env.production
+.env.development
+*.env
+
+# Arquivos de secrets
+secrets.json
+secrets.yaml
+secrets.yml
+credentials.json
 
 # =============================================================================
 # PYTHON
@@ -21,12 +29,20 @@ venv/
 env/
 .venv/
 .env/
+ENV/
 
 # Distribution / packaging
 build/
 dist/
 *.egg-info/
 *.egg
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
 
 # =============================================================================
 # IDEs
@@ -55,6 +71,9 @@ Desktop.ini
 .AppleDouble
 .LSOverride
 
+# Linux
+*~
+
 # =============================================================================
 # ARQUIVOS DO PROJETO
 # =============================================================================
@@ -68,6 +87,10 @@ Desktop.ini
 # Cache do Streamlit
 .streamlit/
 
+# Arquivos temporarios
+*.tmp
+*.temp
+
 # =============================================================================
 # BANCO DE DADOS LOCAL
 # =============================================================================
@@ -80,3 +103,16 @@ data/
 
 # ChromaDB
 chroma/
+
+# =============================================================================
+# ARQUIVOS GRANDES
+# =============================================================================
+
+# Modelos de ML (se houver)
+*.h5
+*.pkl
+*.model
+
+# Arquivos de backup
+*.bak
+*.backup

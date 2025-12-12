@@ -314,8 +314,12 @@ def contar_templates() -> int:
 
 
 # =============================================================================
-# CHROMADB - Busca por Similaridade (Futuro)
+# CHROMADB - Busca por Similaridade
 # =============================================================================
+
+# Limiar de similaridade (0.0 a 1.0) - quanto maior, mais similar deve ser
+LIMIAR_SIMILARIDADE = 0.75
+
 
 def get_colecao_chroma():
     """Retorna a colecao do ChromaDB para embeddings."""
@@ -331,6 +335,168 @@ def get_colecao_chroma():
     )
 
     return colecao
+
+
+def normalizar_texto_para_embedding(texto: str) -> str:
+    """
+    Normaliza o texto do documento para criar embedding.
+    Remove valores variaveis e mantem apenas a estrutura.
+    """
+    import re
+
+    # Remove numeros
+    texto = re.sub(r'\d+', ' NUM ', texto)
+
+    # Remove valores monetarios
+    texto = re.sub(r'R\$\s*[\d.,]+', ' VALOR ', texto)
+
+    # Remove datas
+    texto = re.sub(r'\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}', ' DATA ', texto)
+
+    # Remove CPF/CNPJ
+    texto = re.sub(r'\d{3}[.\s]?\d{3}[.\s]?\d{3}[-.\s]?\d{2}', ' CPF ', texto)
+    texto = re.sub(r'\d{2}[.\s]?\d{3}[.\s]?\d{3}[/.\s]?\d{4}[-.\s]?\d{2}', ' CNPJ ', texto)
+
+    # Remove emails
+    texto = re.sub(r'[\w.-]+@[\w.-]+\.\w+', ' EMAIL ', texto)
+
+    # Remove telefones
+    texto = re.sub(r'\(?\d{2}\)?\s*\d{4,5}[-.\s]?\d{4}', ' TELEFONE ', texto)
+
+    # Remove multiplos espacos
+    texto = re.sub(r'\s+', ' ', texto)
+
+    return texto.strip().lower()
+
+
+def salvar_embedding(doc_hash: str, texto_documento: str, template_id: int) -> bool:
+    """
+    Salva o embedding do documento no ChromaDB.
+
+    Args:
+        doc_hash: Hash unico do documento
+        texto_documento: Texto completo do documento
+        template_id: ID do template no SQLite
+
+    Returns:
+        True se salvou, False se ChromaDB nao disponivel
+    """
+    colecao = get_colecao_chroma()
+    if colecao is None:
+        return False
+
+    try:
+        # Normaliza o texto para embedding
+        texto_normalizado = normalizar_texto_para_embedding(texto_documento)
+
+        # Verifica se ja existe
+        existentes = colecao.get(ids=[doc_hash])
+        if existentes and existentes['ids']:
+            # Atualiza
+            colecao.update(
+                ids=[doc_hash],
+                documents=[texto_normalizado],
+                metadatas=[{"template_id": template_id, "hash": doc_hash}]
+            )
+        else:
+            # Insere novo
+            colecao.add(
+                ids=[doc_hash],
+                documents=[texto_normalizado],
+                metadatas=[{"template_id": template_id, "hash": doc_hash}]
+            )
+
+        return True
+
+    except Exception as e:
+        print(f"Erro ao salvar embedding: {e}")
+        return False
+
+
+def buscar_template_similar(texto_documento: str, limiar: float = None) -> Optional[Tuple[str, float, List[dict]]]:
+    """
+    Busca um template similar no ChromaDB.
+
+    Args:
+        texto_documento: Texto do documento a buscar
+        limiar: Limiar minimo de similaridade (0.0 a 1.0)
+
+    Returns:
+        Tupla (hash, similaridade, mapeamentos) ou None se nao encontrou
+    """
+    colecao = get_colecao_chroma()
+    if colecao is None:
+        return None
+
+    if limiar is None:
+        limiar = LIMIAR_SIMILARIDADE
+
+    try:
+        # Normaliza o texto para busca
+        texto_normalizado = normalizar_texto_para_embedding(texto_documento)
+
+        # Busca os mais similares
+        resultados = colecao.query(
+            query_texts=[texto_normalizado],
+            n_results=1,
+            include=["distances", "metadatas"]
+        )
+
+        if not resultados or not resultados['ids'] or not resultados['ids'][0]:
+            return None
+
+        # ChromaDB retorna distancia (menor = mais similar)
+        # Convertemos para similaridade (maior = mais similar)
+        distancia = resultados['distances'][0][0]
+        similaridade = 1.0 / (1.0 + distancia)  # Converte distancia em similaridade
+
+        if similaridade < limiar:
+            return None
+
+        # Recupera o hash do template encontrado
+        hash_encontrado = resultados['metadatas'][0][0]['hash']
+
+        # Carrega os mapeamentos do SQLite
+        mapeamentos = carregar_template(hash_encontrado)
+
+        if mapeamentos is None:
+            return None
+
+        return (hash_encontrado, similaridade, mapeamentos)
+
+    except Exception as e:
+        print(f"Erro na busca por similaridade: {e}")
+        return None
+
+
+def deletar_embedding(doc_hash: str) -> bool:
+    """
+    Deleta um embedding do ChromaDB.
+
+    Args:
+        doc_hash: Hash do documento
+
+    Returns:
+        True se deletou, False se nao encontrou ou erro
+    """
+    colecao = get_colecao_chroma()
+    if colecao is None:
+        return False
+
+    try:
+        colecao.delete(ids=[doc_hash])
+        return True
+    except Exception:
+        return False
+
+
+def contar_embeddings() -> int:
+    """Retorna o numero de embeddings no ChromaDB."""
+    colecao = get_colecao_chroma()
+    if colecao is None:
+        return 0
+
+    return colecao.count()
 
 
 # =============================================================================
@@ -352,7 +518,7 @@ if __name__ == "__main__":
 
     print(f"\n[3] Caminho do banco: {SQLITE_DB}")
 
-    print("\n[4] Testando operacoes...")
+    print("\n[4] Testando operacoes SQLite...")
 
     # Teste de salvamento
     mapeamentos_teste = [
@@ -374,6 +540,52 @@ if __name__ == "__main__":
     # Teste de existencia
     existe = template_existe("hash_teste_123")
     print(f"    - Template existe: {existe}")
+
+    # =============================================================================
+    # TESTE DO CHROMADB
+    # =============================================================================
+
+    if CHROMADB_DISPONIVEL:
+        print("\n[5] Testando ChromaDB (busca por similaridade)...")
+
+        # Texto de exemplo (simula um documento)
+        texto_doc1 = """
+        NOTA FISCAL
+        Cliente: Joao Silva
+        CPF: 123.456.789-00
+        Data: 15/12/2024
+        Valor Total: R$ 1.500,00
+        """
+
+        # Salva embedding
+        salvou = salvar_embedding("hash_teste_123", texto_doc1, template_id)
+        print(f"    - Embedding salvo: {salvou}")
+
+        # Conta embeddings
+        total_embeddings = contar_embeddings()
+        print(f"    - Total de embeddings: {total_embeddings}")
+
+        # Texto similar (mesmo template, dados diferentes)
+        texto_doc2 = """
+        NOTA FISCAL
+        Cliente: Maria Santos
+        CPF: 987.654.321-00
+        Data: 20/12/2024
+        Valor Total: R$ 2.300,00
+        """
+
+        # Busca por similaridade
+        resultado = buscar_template_similar(texto_doc2)
+        if resultado:
+            hash_enc, similaridade, maps = resultado
+            print(f"    - Template similar encontrado!")
+            print(f"      Hash: {hash_enc}")
+            print(f"      Similaridade: {similaridade:.2%}")
+            print(f"      Campos: {len(maps)}")
+        else:
+            print("    - Nenhum template similar encontrado")
+
+        print(f"\n[6] Caminho do ChromaDB: {CHROMA_DIR}")
 
     print("\n" + "=" * 60)
     print("BANCO DE DADOS FUNCIONANDO!")

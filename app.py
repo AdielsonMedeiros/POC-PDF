@@ -38,13 +38,27 @@ from ocr_engine import (
     TESSERACT_DISPONIVEL
 )
 
+# Importa o conversor de documentos
+from conversor import (
+    processar_documento,
+    extrair_texto_documento,
+    formato_suportado,
+    eh_pdf,
+    eh_imagem,
+    eh_word,
+    TODOS_FORMATOS
+)
+
 # Importa o banco de dados
 from database import (
     salvar_template,
     carregar_template,
     listar_templates,
     template_existe,
-    contar_templates
+    contar_templates,
+    salvar_embedding,
+    buscar_template_similar,
+    CHROMADB_DISPONIVEL
 )
 
 # =============================================================================
@@ -228,21 +242,21 @@ def calcular_hash_documento(pdf_file) -> str:
         return hashlib.md5(conteudo).hexdigest()[:16]
 
 
-def extrair_texto_com_coordenadas(pdf_file, forcar_ocr: bool = False) -> Tuple[str, List[dict], Tuple[float, float], str]:
+def extrair_texto_com_coordenadas(file, filename: str, forcar_ocr: bool = False) -> Tuple[str, List[dict], Tuple[float, float], str]:
     """
-    Extrai texto e coordenadas do PDF.
-    Detecta automaticamente se deve usar OCR ou extracao nativa.
+    Extrai texto e coordenadas de qualquer documento suportado.
+    Detecta automaticamente o tipo e usa o metodo apropriado.
 
     Returns:
         - texto_completo: String com todo o texto
         - palavras: Lista de dicts com coordenadas
         - page_size: Tupla (largura, altura)
-        - metodo: Metodo usado ("pdfplumber" ou "tesseract")
+        - metodo: Metodo usado
     """
-    texto, palavras, page_size, metodo = extrair_texto_automatico(
-        pdf_file,
-        forcar_ocr=forcar_ocr,
-        idioma_ocr="por+eng"
+    texto, palavras, page_size, metodo = extrair_texto_documento(
+        file,
+        filename,
+        forcar_ocr=forcar_ocr
     )
 
     return texto, palavras, page_size, metodo
@@ -471,6 +485,12 @@ if 'doc_hash' not in st.session_state:
     st.session_state.doc_hash = None
 if 'template_do_banco' not in st.session_state:
     st.session_state.template_do_banco = False
+if 'similaridade' not in st.session_state:
+    st.session_state.similaridade = None
+if 'texto_documento' not in st.session_state:
+    st.session_state.texto_documento = None
+if 'arquivo_pdf' not in st.session_state:
+    st.session_state.arquivo_pdf = None
 
 # =============================================================================
 # ETAPA 1: UPLOAD
@@ -479,13 +499,17 @@ if 'template_do_banco' not in st.session_state:
 st.markdown('<div class="section-title">Etapa 1: Carregar Documento</div>', unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader(
-    "Selecione o arquivo PDF",
-    type=['pdf'],
-    help="Formatos aceitos: PDF. Tamanho maximo: 200MB"
+    "Selecione o arquivo",
+    type=['pdf', 'png', 'jpg', 'jpeg', 'bmp', 'tiff', 'tif', 'docx', 'doc'],
+    help="Formatos aceitos: PDF, Imagens (PNG, JPG, JPEG, BMP, TIFF), Word (DOCX, DOC)"
 )
 
 if uploaded_file:
-    st.markdown(f'<div class="status-success">Arquivo carregado: {uploaded_file.name}</div>', unsafe_allow_html=True)
+    # Detecta o tipo de arquivo
+    filename = uploaded_file.name
+    tipo_arquivo = "PDF" if eh_pdf(filename) else "Imagem" if eh_imagem(filename) else "Word" if eh_word(filename) else "Desconhecido"
+
+    st.markdown(f'<div class="status-success">Arquivo carregado: {uploaded_file.name} ({tipo_arquivo})</div>', unsafe_allow_html=True)
 
     st.markdown("")
     st.markdown("**Visualizacao do documento:**")
@@ -494,16 +518,31 @@ if uploaded_file:
     col_left, col_center, col_right = st.columns([1, 2, 1])
     with col_center:
         try:
-            import fitz
-            pdf_bytes = uploaded_file.getvalue()
-            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-            page = doc[0]
-            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
-            img_bytes = pix.tobytes("png")
-            st.image(img_bytes, use_container_width=True)
-            doc.close()
+            if eh_imagem(filename):
+                # Imagem: mostra direto
+                st.image(uploaded_file, use_container_width=True)
+            elif eh_pdf(filename):
+                # PDF: converte primeira pagina para imagem
+                import fitz
+                pdf_bytes = uploaded_file.getvalue()
+                doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                page = doc[0]
+                pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+                img_bytes = pix.tobytes("png")
+                st.image(img_bytes, use_container_width=True)
+                doc.close()
+            elif eh_word(filename):
+                # Word: mostra preview do texto
+                from conversor import extrair_texto_docx
+                uploaded_file.seek(0)
+                texto_preview, _, _ = extrair_texto_docx(uploaded_file)
+                uploaded_file.seek(0)
+                # Limita o preview
+                if len(texto_preview) > 1000:
+                    texto_preview = texto_preview[:1000] + "..."
+                st.text_area("Preview do conteudo", texto_preview, height=300, disabled=True)
         except ImportError:
-            st.info("Instale PyMuPDF para visualizar: pip install pymupdf")
+            st.info("Instale as dependencias para visualizar")
         except Exception as e:
             st.warning("Nao foi possivel gerar preview")
 
@@ -525,13 +564,17 @@ if uploaded_file:
         if st.session_state.mapeamentos:
             qtd = len(st.session_state.mapeamentos)
             metodo = st.session_state.metodo_extracao or "pdfplumber"
+            similaridade = st.session_state.similaridade
 
-            if "banco" in metodo.lower() or st.session_state.template_do_banco:
-                metodo_label = "Template salvo (instantaneo)"
+            if st.session_state.template_do_banco:
+                if similaridade and similaridade < 1.0:
+                    metodo_label = f"Template similar ({similaridade:.0%})"
+                else:
+                    metodo_label = "Template salvo (instantaneo)"
             elif "tesseract" in metodo:
                 metodo_label = "OCR (Tesseract)"
             else:
-                metodo_label = "Texto nativo"
+                metodo_label = "Texto nativo + IA"
 
             st.markdown(f'<br><div class="status-success">{qtd} campo(s) identificado(s) via {metodo_label}</div>', unsafe_allow_html=True)
         elif not analisar:
@@ -544,51 +587,115 @@ if uploaded_file:
             doc_hash = calcular_hash_documento(uploaded_file)
             st.session_state.doc_hash = doc_hash
 
-            # Verifica se ja temos esse template no banco
+            # Verifica se ja temos esse template no banco (hash exato)
             mapeamentos_banco = carregar_template(doc_hash)
 
         if mapeamentos_banco:
             # Template encontrado no banco - usa direto!
             st.session_state.mapeamentos = mapeamentos_banco
             st.session_state.template_do_banco = True
-            st.session_state.metodo_extracao = "banco de dados (cache)"
+            st.session_state.metodo_extracao = "banco de dados (hash exato)"
+            st.session_state.similaridade = 1.0
 
-            # Ainda precisa extrair page_size
+            # Converte para PDF se necessario e extrai page_size
             uploaded_file.seek(0)
-            with pdfplumber.open(uploaded_file) as pdf:
-                page = pdf.pages[0]
-                st.session_state.page_size = (page.width, page.height)
+            
+            if eh_pdf(uploaded_file.name):
+                # PDF: abre direto
+                st.session_state.arquivo_pdf = BytesIO(uploaded_file.getvalue())
+                with pdfplumber.open(uploaded_file) as pdf:
+                    page = pdf.pages[0]
+                    st.session_state.page_size = (page.width, page.height)
+            else:
+                # Outros formatos: converte para PDF
+                pdf_convertido, tipo_original, _ = processar_documento(
+                    uploaded_file,
+                    uploaded_file.name
+                )
+                st.session_state.arquivo_pdf = pdf_convertido
+                
+                # Extrai page_size do PDF convertido
+                pdf_convertido.seek(0)
+                with pdfplumber.open(pdf_convertido) as pdf:
+                    page = pdf.pages[0]
+                    st.session_state.page_size = (page.width, page.height)
 
             st.session_state.pdf_processado = True
             st.session_state.pdf_gerado = None
             st.rerun()
 
         else:
-            # Template novo - analisa com IA
+            # Template nao encontrado por hash exato
+            # Converte documento para PDF (se necessario) e extrai texto
+            with st.spinner("Processando documento..."):
+                uploaded_file.seek(0)
+
+                # Converte para PDF se nao for PDF
+                if not eh_pdf(uploaded_file.name):
+                    pdf_convertido, tipo_original, _ = processar_documento(
+                        uploaded_file,
+                        uploaded_file.name
+                    )
+                    st.session_state.arquivo_pdf = pdf_convertido
+                else:
+                    st.session_state.arquivo_pdf = BytesIO(uploaded_file.getvalue())
+
             with st.spinner("Extraindo texto do documento..."):
                 uploaded_file.seek(0)
-                texto, palavras, page_size, metodo = extrair_texto_com_coordenadas(uploaded_file)
+                texto, palavras, page_size, metodo = extrair_texto_com_coordenadas(
+                    uploaded_file,
+                    uploaded_file.name
+                )
                 st.session_state.page_size = page_size
                 st.session_state.metodo_extracao = metodo
+                st.session_state.texto_documento = texto
 
-            with st.spinner("Identificando campos variaveis com IA..."):
-                variaveis = analisar_com_llm(texto)
+            # Tenta buscar template similar no ChromaDB
+            template_similar = None
+            if CHROMADB_DISPONIVEL:
+                with st.spinner("Buscando template similar..."):
+                    template_similar = buscar_template_similar(texto)
 
-            if variaveis:
-                mapeamentos = mapear_variaveis_para_coordenadas(variaveis, palavras)
-                st.session_state.variaveis_encontradas = variaveis
+            if template_similar:
+                # Encontrou template similar!
+                hash_similar, similaridade, mapeamentos = template_similar
                 st.session_state.mapeamentos = mapeamentos
-                st.session_state.template_do_banco = False
+                st.session_state.template_do_banco = True
+                st.session_state.similaridade = similaridade
+                st.session_state.metodo_extracao = f"similaridade ({similaridade:.0%})"
                 st.session_state.pdf_processado = True
                 st.session_state.pdf_gerado = None
 
-                # Salva o template no banco para uso futuro
+                # Salva este novo documento com os mesmos mapeamentos
                 with st.spinner("Salvando template..."):
-                    salvar_template(doc_hash, mapeamentos)
+                    template_id = salvar_template(doc_hash, mapeamentos)
+                    salvar_embedding(doc_hash, texto, template_id)
 
                 st.rerun()
             else:
-                st.error("Nao foi possivel identificar campos variaveis no documento.")
+                # Nenhum template encontrado - analisa com IA
+                with st.spinner("Identificando campos variaveis com IA..."):
+                    variaveis = analisar_com_llm(texto)
+
+                if variaveis:
+                    mapeamentos = mapear_variaveis_para_coordenadas(variaveis, palavras)
+                    st.session_state.variaveis_encontradas = variaveis
+                    st.session_state.mapeamentos = mapeamentos
+                    st.session_state.template_do_banco = False
+                    st.session_state.similaridade = None
+                    st.session_state.pdf_processado = True
+                    st.session_state.pdf_gerado = None
+
+                    # Salva o template no banco para uso futuro
+                    with st.spinner("Salvando template..."):
+                        template_id = salvar_template(doc_hash, mapeamentos)
+                        # Salva embedding para busca por similaridade
+                        if CHROMADB_DISPONIVEL:
+                            salvar_embedding(doc_hash, texto, template_id)
+
+                    st.rerun()
+                else:
+                    st.error("Nao foi possivel identificar campos variaveis no documento.")
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
@@ -651,9 +758,16 @@ if st.session_state.mapeamentos:
                 st.warning("Preencha pelo menos um campo com novo valor.")
             else:
                 with st.spinner("Gerando documento..."):
-                    uploaded_file.seek(0)
+                    # Usa o arquivo PDF (original ou convertido)
+                    arquivo_pdf = st.session_state.arquivo_pdf
+                    if arquivo_pdf is None:
+                        # Fallback para uploaded_file se for PDF
+                        uploaded_file.seek(0)
+                        arquivo_pdf = BytesIO(uploaded_file.getvalue())
+                    
+                    arquivo_pdf.seek(0)
                     pdf_bytes = gerar_pdf_com_substituicoes(
-                        uploaded_file,
+                        arquivo_pdf,
                         st.session_state.mapeamentos,
                         novos_valores,
                         st.session_state.page_size
@@ -671,7 +785,7 @@ if st.session_state.mapeamentos:
                 use_container_width=True
             )
 
-    # Preview do PDF gerado
+    
     if st.session_state.pdf_gerado:
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         st.markdown('<div class="section-title">Resultado Final</div>', unsafe_allow_html=True)
