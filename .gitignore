@@ -67,3 +67,16 @@ Desktop.ini
 
 # Cache do Streamlit
 .streamlit/
+
+# =============================================================================
+# BANCO DE DADOS LOCAL
+# =============================================================================
+
+# SQLite database
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# ChromaDB
+chroma/

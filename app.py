@@ -38,6 +38,15 @@ from ocr_engine import (
     TESSERACT_DISPONIVEL
 )
 
+# Importa o banco de dados
+from database import (
+    salvar_template,
+    carregar_template,
+    listar_templates,
+    template_existe,
+    contar_templates
+)
+
 # =============================================================================
 # CONFIGURACAO
 # =============================================================================
@@ -186,6 +195,38 @@ st.markdown("""
 # =============================================================================
 # FUNCOES DO PROCESSAMENTO
 # =============================================================================
+
+def calcular_hash_documento(pdf_file) -> str:
+    """
+    Calcula um hash do documento para identificar templates conhecidos.
+    Usa o conteudo do PDF para gerar um hash unico.
+    """
+    import hashlib
+    import re
+
+    if hasattr(pdf_file, 'seek'):
+        pdf_file.seek(0)
+
+    try:
+        with pdfplumber.open(pdf_file) as pdf:
+            texto_completo = ""
+            for page in pdf.pages:
+                texto_completo += page.extract_text() or ""
+
+        # Remove numeros e valores variaveis para criar hash do "esqueleto"
+        texto_normalizado = re.sub(r'\d+', '', texto_completo)
+        texto_normalizado = re.sub(r'R\$\s*[\d.,]+', '', texto_normalizado)
+
+        return hashlib.md5(texto_normalizado.encode()).hexdigest()[:16]
+    except:
+        # Fallback: usa hash do arquivo
+        if hasattr(pdf_file, 'seek'):
+            pdf_file.seek(0)
+        conteudo = pdf_file.read() if hasattr(pdf_file, 'read') else pdf_file
+        if hasattr(pdf_file, 'seek'):
+            pdf_file.seek(0)
+        return hashlib.md5(conteudo).hexdigest()[:16]
+
 
 def extrair_texto_com_coordenadas(pdf_file, forcar_ocr: bool = False) -> Tuple[str, List[dict], Tuple[float, float], str]:
     """
@@ -426,6 +467,10 @@ if 'pdf_gerado' not in st.session_state:
     st.session_state.pdf_gerado = None
 if 'metodo_extracao' not in st.session_state:
     st.session_state.metodo_extracao = None
+if 'doc_hash' not in st.session_state:
+    st.session_state.doc_hash = None
+if 'template_do_banco' not in st.session_state:
+    st.session_state.template_do_banco = False
 
 # =============================================================================
 # ETAPA 1: UPLOAD
@@ -480,30 +525,70 @@ if uploaded_file:
         if st.session_state.mapeamentos:
             qtd = len(st.session_state.mapeamentos)
             metodo = st.session_state.metodo_extracao or "pdfplumber"
-            metodo_label = "OCR (Tesseract)" if "tesseract" in metodo else "Texto nativo"
+
+            if "banco" in metodo.lower() or st.session_state.template_do_banco:
+                metodo_label = "Template salvo (instantaneo)"
+            elif "tesseract" in metodo:
+                metodo_label = "OCR (Tesseract)"
+            else:
+                metodo_label = "Texto nativo"
+
             st.markdown(f'<br><div class="status-success">{qtd} campo(s) identificado(s) via {metodo_label}</div>', unsafe_allow_html=True)
         elif not analisar:
             st.markdown('<br><div class="status-waiting">Aguardando analise do documento</div>', unsafe_allow_html=True)
 
     if analisar:
-        with st.spinner("Extraindo texto do documento..."):
+        # Primeiro, calcula o hash do documento
+        with st.spinner("Verificando documento..."):
             uploaded_file.seek(0)
-            texto, palavras, page_size, metodo = extrair_texto_com_coordenadas(uploaded_file)
-            st.session_state.page_size = page_size
-            st.session_state.metodo_extracao = metodo
+            doc_hash = calcular_hash_documento(uploaded_file)
+            st.session_state.doc_hash = doc_hash
 
-        with st.spinner("Identificando campos variaveis com IA..."):
-            variaveis = analisar_com_llm(texto)
+            # Verifica se ja temos esse template no banco
+            mapeamentos_banco = carregar_template(doc_hash)
 
-        if variaveis:
-            mapeamentos = mapear_variaveis_para_coordenadas(variaveis, palavras)
-            st.session_state.variaveis_encontradas = variaveis
-            st.session_state.mapeamentos = mapeamentos
+        if mapeamentos_banco:
+            # Template encontrado no banco - usa direto!
+            st.session_state.mapeamentos = mapeamentos_banco
+            st.session_state.template_do_banco = True
+            st.session_state.metodo_extracao = "banco de dados (cache)"
+
+            # Ainda precisa extrair page_size
+            uploaded_file.seek(0)
+            with pdfplumber.open(uploaded_file) as pdf:
+                page = pdf.pages[0]
+                st.session_state.page_size = (page.width, page.height)
+
             st.session_state.pdf_processado = True
-            st.session_state.pdf_gerado = None  # Reset PDF gerado
+            st.session_state.pdf_gerado = None
             st.rerun()
+
         else:
-            st.error("Nao foi possivel identificar campos variaveis no documento.")
+            # Template novo - analisa com IA
+            with st.spinner("Extraindo texto do documento..."):
+                uploaded_file.seek(0)
+                texto, palavras, page_size, metodo = extrair_texto_com_coordenadas(uploaded_file)
+                st.session_state.page_size = page_size
+                st.session_state.metodo_extracao = metodo
+
+            with st.spinner("Identificando campos variaveis com IA..."):
+                variaveis = analisar_com_llm(texto)
+
+            if variaveis:
+                mapeamentos = mapear_variaveis_para_coordenadas(variaveis, palavras)
+                st.session_state.variaveis_encontradas = variaveis
+                st.session_state.mapeamentos = mapeamentos
+                st.session_state.template_do_banco = False
+                st.session_state.pdf_processado = True
+                st.session_state.pdf_gerado = None
+
+                # Salva o template no banco para uso futuro
+                with st.spinner("Salvando template..."):
+                    salvar_template(doc_hash, mapeamentos)
+
+                st.rerun()
+            else:
+                st.error("Nao foi possivel identificar campos variaveis no documento.")
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 

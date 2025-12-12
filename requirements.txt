@@ -34,6 +34,9 @@ google-generativeai>=0.3.0
 # Variaveis de ambiente
 python-dotenv>=1.0.0
 
+# Banco de dados local
+chromadb>=0.4.0
+
 # =============================================================================
 # INSTALACAO DO TESSERACT (necessario alem do pip):
 # =============================================================================

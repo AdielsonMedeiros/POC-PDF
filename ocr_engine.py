@@ -58,7 +58,7 @@ def configurar_tesseract_windows():
     """
     Tenta configurar o caminho do Tesseract no Windows.
     """
-    if sys.platform == 'win32':
+    if sys.platform == 'win32' and TESSERACT_DISPONIVEL:
         # Caminhos comuns de instalacao no Windows
         caminhos_possiveis = [
             r'C:\Program Files\Tesseract-OCR\tesseract.exe',
@@ -72,6 +72,11 @@ def configurar_tesseract_windows():
                 return True
 
     return False
+
+
+# Configura automaticamente ao importar o modulo
+if TESSERACT_DISPONIVEL:
+    configurar_tesseract_windows()
 
 
 def detectar_pdf_escaneado(pdf_file, limiar_caracteres: int = 50) -> bool:
