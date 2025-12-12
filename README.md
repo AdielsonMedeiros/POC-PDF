@@ -229,4 +229,4 @@ Verifique se os pacotes de idioma do Tesseract estão instalados (`tesseract-ocr
 
 ---
 
-Desenvolvido com ❤️ usando Python e IA
+
